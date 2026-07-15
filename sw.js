@@ -1,4 +1,4 @@
-const CACHE_NAME = 'num10-game-v8';
+const CACHE_NAME = 'num10-game-v9';
 
 // All assets needed for a fully offline run are precached on install,
 // including the OCR engine files (worker script, wasm core, language

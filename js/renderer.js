@@ -5,14 +5,14 @@
  */
 
 const PALETTE = [
-  'rgb(245,130,48)',
-  'rgb(113,179,60)',
-  'rgb(147,112,219)',
-  'rgb(30,160,230)',
-  'rgb(255,20,147)',
-  'rgb(200,200,0)',
-  'rgb(70,130,180)',
-  'rgb(220,20,60)',
+  'rgb(255,100,0)',
+  'rgb(60,60,255)',
+  'rgb(255,220,0)',
+  'rgb(230,0,0)',
+  'rgb(200,0,255)',
+  'rgb(0,140,255)',
+  'rgb(255,60,60)',
+  'rgb(140,0,200)',
 ];
 
 function cloneCanvas(srcCanvas) {
@@ -53,7 +53,7 @@ function renderRound(baseCanvas, cellBoxes, rectsThisRound, clearedBefore, round
     const y1 = boxBR.y + boxBR.h + 6;
 
     ctx.save();
-    ctx.globalAlpha = 0.18;
+    ctx.globalAlpha = 0.30;
     ctx.fillStyle = color;
     ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
     ctx.restore();
