@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="消消乐求解">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>数字消消乐 · 离线自动求解</title>
+<style>
+  :root {
+    --bg: #f4f5f3;
+    --card: #ffffff;
+    --accent: #1d9e75;
+    --accent-dark: #0f6e56;
+    --text: #22221f;
+    --muted: #6f6f68;
+    --border: #e2e0d6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding-bottom: 40px;
+  }
+  header { padding: 20px 20px 12px; text-align: center; }
+  header h1 { font-size: 20px; margin: 0 0 4px; font-weight: 600; }
+  header p { font-size: 13px; color: var(--muted); margin: 0; }
+  .container { max-width: 480px; margin: 0 auto; padding: 0 16px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    margin-top: 16px;
+  }
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .btn-row { display: flex; gap: 10px; margin-top: 14px; }
+  .btn {
+    flex: 1;
+    padding: 14px 10px;
+    border-radius: 12px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:active { background: var(--accent-dark); }
+  .btn-secondary { background: #eef0ec; color: var(--text); }
+  .btn:disabled { opacity: 0.5; }
+  input[type="file"] { display: none; }
+  #preview-wrap { margin-top: 14px; text-align: center; display: none; }
+  #preview-wrap img { max-width: 100%; border-radius: 12px; border: 1px solid var(--border); }
+  .status { margin-top: 14px; font-size: 13px; color: var(--muted); text-align: center; min-height: 18px; }
+  .spinner {
+    width: 22px; height: 22px;
+    border: 3px solid #d8d8d0;
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .progress-bar {
+    height: 8px;
+    background: #eef0ec;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.2s;
+  }
+  .summary { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .summary b { color: var(--text); font-weight: 600; }
+  .round-card { margin-top: 14px; }
+  .round-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+  .round-title .tag { font-size: 11px; font-weight: 500; background: #eaf3de; color: #3b6d11; padding: 3px 9px; border-radius: 999px; }
+  .round-card canvas, .round-card img { width: 100%; border-radius: 12px; border: 1px solid var(--border); display: block; }
+  .error-box { background: #fcebeb; color: #791f1f; border: 1px solid #f09595; border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-top: 14px; }
+  .warn-box { background: #faeeda; color: #633806; border: 1px solid #ef9f27; border-radius: 10px; padding: 10px 14px; font-size: 12px; margin-top: 10px; }
+  .offline-badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    margin-top: 8px;
+  }
+  .offline-badge.ready { background: #eaf3de; color: #3b6d11; }
+  .offline-badge.loading { background: #faeeda; color: #633806; }
+  footer { text-align: center; font-size: 12px; color: var(--muted); margin-top: 30px; padding: 0 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>数字消消乐 · 离线自动求解</h1>
+  <p>全部计算在本机浏览器内完成，无需网络、无需服务器</p>
+  <div id="offline-badge" class="offline-badge loading">正在准备离线资源...</div>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div id="upload-zone" class="upload-zone">点击下方按钮拍照或从相册选择游戏截图</div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-camera">拍照</button>
+      <button class="btn btn-secondary" id="btn-gallery">从相册选择</button>
+    </div>
+    <input type="file" id="file-camera" accept="image/*" capture="environment">
+    <input type="file" id="file-gallery" accept="image/*">
+    <div id="preview-wrap"><img id="preview-img" alt="预览"></div>
+    <div class="status" id="status"></div>
+    <div class="progress-bar" id="progress-bar" style="display:none;"><div class="progress-bar-fill" id="progress-fill"></div></div>
+  </div>
+
+  <div id="results"></div>
+</div>
+
+<footer>
+  规则：任意大小矩形内数字和为 10 即可消除；已消除格按 0 计入后续求和；同一轮内矩形不重叠；逐轮消除直到无法再消除为止。
+</footer>
+
+<script src="vendor/tesseract.min.js"></script>
+<script src="js/grid-detect.js"></script>
+<script src="js/ocr.js"></script>
+<script src="js/solver.js"></script>
+<script src="js/renderer.js"></script>
+<script>
+const btnCamera = document.getElementById('btn-camera');
+const btnGallery = document.getElementById('btn-gallery');
+const fileCamera = document.getElementById('file-camera');
+const fileGallery = document.getElementById('file-gallery');
+const previewWrap = document.getElementById('preview-wrap');
+const previewImg = document.getElementById('preview-img');
+const statusEl = document.getElementById('status');
+const resultsEl = document.getElementById('results');
+const progressBar = document.getElementById('progress-bar');
+const progressFill = document.getElementById('progress-fill');
+const offlineBadge = document.getElementById('offline-badge');
+
+btnCamera.addEventListener('click', () => fileCamera.click());
+btnGallery.addEventListener('click', () => fileGallery.click());
+fileCamera.addEventListener('change', (e) => handleFile(e.target.files[0]));
+fileGallery.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+function setButtonsEnabled(enabled) {
+  btnCamera.disabled = !enabled;
+  btnGallery.disabled = !enabled;
+}
+
+async function warmUpOCR() {
+  try {
+    await Num10OCR.getWorker();
+    offlineBadge.textContent = '离线资源已就绪，可断网使用';
+    offlineBadge.className = 'offline-badge ready';
+  } catch (err) {
+    offlineBadge.textContent = '离线资源加载失败：' + err.message;
+    offlineBadge.className = 'offline-badge loading';
+  }
+}
+warmUpOCR();
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    previewImg.src = ev.target.result;
+    previewWrap.style.display = 'block';
+    const img = new Image();
+    img.onload = () => runPipeline(img);
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function runPipeline(imgEl) {
+  resultsEl.innerHTML = '';
+  setButtonsEnabled(false);
+  progressBar.style.display = 'none';
+  statusEl.innerHTML = '<span class="spinner"></span>正在检测棋盘网格...';
+
+  try {
+    const canvas = Num10GridDetect.loadImageToCanvas(imgEl);
+    const detection = Num10GridDetect.detectGrid(canvas);
+
+    progressBar.style.display = 'block';
+    progressFill.style.width = '0%';
+    statusEl.innerHTML = '<span class="spinner"></span>正在识别数字 (0%)...';
+
+    const { grid, confidence } = await Num10OCR.ocrGrid(canvas, detection, (done, total) => {
+      const pct = Math.round((done / total) * 100);
+      progressFill.style.width = pct + '%';
+      statusEl.innerHTML = `<span class="spinner"></span>正在识别数字 (${pct}%)...`;
+    });
+
+    statusEl.innerHTML = '<span class="spinner"></span>正在求解消除...';
+    const { rounds, finalBoard } = Num10Solver.solve(grid);
+
+    statusEl.innerHTML = '<span class="spinner"></span>正在渲染结果图片...';
+    const images = Num10Renderer.renderAllRounds(canvas, detection, rounds);
+
+    let lowConfCount = 0;
+    for (let r = 0; r < detection.rows; r++) {
+      for (let c = 0; c < detection.cols; c++) {
+        if (!confidence[r][c]) lowConfCount++;
+      }
+    }
+
+    window.__lastResult = { grid, confidence, rows: detection.rows, cols: detection.cols, rounds: rounds.map(r => ({ round: r.round, rects: r.rects })), finalBoard };
+    renderResults({ detection, rounds, images, lowConfCount });
+  } catch (err) {
+    statusEl.textContent = '';
+    resultsEl.innerHTML = `<div class="error-box">处理失败：${err.message}</div>`;
+    console.error(err);
+  } finally {
+    setButtonsEnabled(true);
+  }
+}
+
+function renderResults({ detection, rounds, images, lowConfCount }) {
+  statusEl.textContent = '';
+  progressBar.style.display = 'none';
+
+  let html = '';
+  html += `<div class="card">
+    <div class="summary"><span>识别网格</span><b>${detection.rows} 行 × ${detection.cols} 列</b></div>
+    <div class="summary"><span>可消除轮数</span><b>${rounds.length} 轮</b></div>
+  </div>`;
+
+  if (lowConfCount > 0) {
+    html += `<div class="warn-box">有 ${lowConfCount} 个数字识别置信度较低，建议拍摄更清晰、光线均匀的照片以提高准确率。</div>`;
+  }
+
+  if (rounds.length === 0) {
+    html += `<div class="card">当前棋盘没有可消除的矩形。</div>`;
+  }
+
+  resultsEl.innerHTML = html;
+
+  images.forEach((img) => {
+    const card = document.createElement('div');
+    card.className = 'card round-card';
+    const title = document.createElement('div');
+    title.className = 'round-title';
+    if (img.round != null) {
+      title.innerHTML = `第 ${img.round} 轮 <span class="tag">消除 ${img.rects.length} 组</span>`;
+    } else {
+      title.innerHTML = `最终结果 <span class="tag">无法再消除</span>`;
+    }
+    card.appendChild(title);
+    card.appendChild(img.canvas);
+    resultsEl.appendChild(card);
+  });
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW register failed', err));
+  });
+}
+</script>
+</body>
+</html>

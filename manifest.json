@@ -1,0 +1,15 @@
+{
+  "name": "数字消消乐求解器",
+  "short_name": "消消乐求解",
+  "description": "拍照识别数字消除棋盘，离线自动求解逐轮消除",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f5f3",
+  "theme_color": "#1d9e75",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
