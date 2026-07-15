@@ -290,66 +290,76 @@ function reconstructMoveSequence(board, state, maxMoves) {
   return moves;
 }
 
+// Assign each move in the ordered sequence to the EARLIEST round it could
+// possibly run in, based purely on real cell-usage constraints -- not on
+// the arbitrary order the search happened to discover them in.
+//
+// Two constraints determine the earliest valid round for a move:
+//   1. Data dependency: a rectangle may span already-cleared ("zero")
+//      cells as padding, which were cleared by some earlier move -- this
+//      move cannot run before that earlier move's round has finished.
+//   2. No-overlap-within-a-round: two rectangles in the SAME round can
+//      never share a cell, even a shared zero-padding cell (displaying
+//      two overlapping boxes in one round is confusing/wrong even though
+//      clearing an empty cell twice would be harmless in isolation).
+//
+// Both are enforced by tracking, per cell, the round of the most recent
+// move whose rectangle covered it (nonzero or zero). A move's round is
+// then 1 + max(that value over every cell in its rectangle), or round 1
+// if untouched so far. This is standard "as-early-as-possible" DAG task
+// scheduling and yields the minimum number of rounds for this exact
+// sequence of moves (it does not change WHAT is cleared, only which
+// round each move is displayed in).
+function compactMoveRounds(board, moves) {
+  const rows = board.length;
+  const cols = rows ? board[0].length : 0;
+  const lastTouchRound = Array.from({ length: rows }, () => new Array(cols).fill(0));
+  const roundOf = new Array(moves.length).fill(0);
+
+  for (let i = 0; i < moves.length; i++) {
+    const [r0, c0, r1, c1] = moves[i];
+    let maxTouch = 0;
+    for (let r = r0; r <= r1; r++) {
+      const row = lastTouchRound[r];
+      for (let c = c0; c <= c1; c++) {
+        if (row[c] > maxTouch) maxTouch = row[c];
+      }
+    }
+    const thisRound = maxTouch + 1;
+    roundOf[i] = thisRound;
+    for (let r = r0; r <= r1; r++) {
+      const row = lastTouchRound[r];
+      for (let c = c0; c <= c1; c++) row[c] = thisRound;
+    }
+  }
+  return roundOf;
+}
+
 function groupIntoRounds(board, moves) {
-  const rounds = [];
-  let roundBoard = board.map((row) => row.slice());
-  let currentRects = [];
-  let usedCells = new Set();
+  const roundOf = compactMoveRounds(board, moves);
+  const numRounds = roundOf.length ? Math.max(...roundOf) : 0;
 
-  function sumAgainst(b, r0, c0, r1, c1) {
-    let s = 0;
-    for (let r = r0; r <= r1; r++) {
-      for (let c = c0; c <= c1; c++) s += b[r][c];
-    }
-    return s;
+  const rectsByRound = Array.from({ length: numRounds }, () => []);
+  for (let i = 0; i < moves.length; i++) {
+    rectsByRound[roundOf[i] - 1].push(moves[i]);
   }
-
-  function flush() {
-    if (currentRects.length) {
-      rounds.push({
-        boardBefore: roundBoard.map((row) => row.slice()),
-        rects: currentRects.map(([r0, c0, r1, c1]) => [r0, c0, r1 - r0 + 1, c1 - c0 + 1]),
-      });
-      for (const [r0, c0, r1, c1] of currentRects) {
-        for (let r = r0; r <= r1; r++) {
-          for (let c = c0; c <= c1; c++) roundBoard[r][c] = 0;
-        }
-      }
-    }
-    currentRects = [];
-    usedCells = new Set();
-  }
-
-  for (const rect of moves) {
-    const [r0, c0, r1, c1] = rect;
-    const cells = [];
-    for (let r = r0; r <= r1; r++) {
-      for (let c = c0; c <= c1; c++) cells.push(r * 1000 + c);
-    }
-    const overlaps = cells.some((cell) => usedCells.has(cell));
-    let validSum = sumAgainst(roundBoard, r0, c0, r1, c1) === 10;
-    if (overlaps || !validSum) {
-      flush();
-      validSum = sumAgainst(roundBoard, r0, c0, r1, c1) === 10;
-      if (!validSum) {
-        throw new Error('reconstructed move invalid even in a fresh round -- bug in move sequence');
-      }
-    }
-    currentRects.push(rect);
-    for (const cell of cells) usedCells.add(cell);
-  }
-  flush();
 
   const out = [];
-  for (let i = 0; i < rounds.length; i++) {
-    const rd = rounds[i];
-    const after = rd.boardBefore.map((row) => row.slice());
-    for (const [r0, c0, rs, cs] of rd.rects) {
-      for (let r = r0; r < r0 + rs; r++) {
-        for (let c = c0; c < c0 + cs; c++) after[r][c] = 0;
+  let running = board.map((row) => row.slice());
+  for (let i = 0; i < rectsByRound.length; i++) {
+    const before = running.map((row) => row.slice());
+    for (const [r0, c0, r1, c1] of rectsByRound[i]) {
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) running[r][c] = 0;
       }
     }
-    out.push({ round: i + 1, boardBefore: rd.boardBefore, boardAfter: after, rects: rd.rects });
+    const after = running.map((row) => row.slice());
+    out.push({
+      round: i + 1,
+      boardBefore: before,
+      boardAfter: after,
+      rects: rectsByRound[i].map(([r0, c0, r1, c1]) => [r0, c0, r1 - r0 + 1, c1 - c0 + 1]),
+    });
   }
   const finalBoard = out.length ? out[out.length - 1].boardAfter : board.map((row) => row.slice());
   return { rounds: out, finalBoard };
