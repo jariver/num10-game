@@ -127,12 +127,10 @@
   </div>
 
   <div class="card" id="upload-card" style="display:none;">
-    <div id="upload-zone" class="upload-zone">点击下方按钮拍照或从相册选择游戏截图</div>
+    <div id="upload-zone" class="upload-zone">点击下方按钮从相册选择游戏截图</div>
     <div class="btn-row">
-      <button class="btn btn-primary" id="btn-camera" disabled>拍照</button>
-      <button class="btn btn-secondary" id="btn-gallery" disabled>从相册选择</button>
+      <button class="btn btn-primary" id="btn-gallery" disabled>从相册选择</button>
     </div>
-    <input type="file" id="file-camera" accept="image/*" capture="environment">
     <input type="file" id="file-gallery" accept="image/*">
     <div id="preview-wrap"><img id="preview-img" alt="预览"></div>
     <div class="status" id="status"></div>
@@ -153,9 +151,7 @@
 <script src="js/branch-solver.js"></script>
 <script src="js/renderer.js"></script>
 <script>
-const btnCamera = document.getElementById('btn-camera');
 const btnGallery = document.getElementById('btn-gallery');
-const fileCamera = document.getElementById('file-camera');
 const fileGallery = document.getElementById('file-gallery');
 const previewWrap = document.getElementById('preview-wrap');
 const previewImg = document.getElementById('preview-img');
@@ -170,13 +166,10 @@ const engineProgressFill = document.getElementById('engine-progress-fill');
 const engineLoadingHint = document.getElementById('engine-loading-hint');
 const uploadCard = document.getElementById('upload-card');
 
-btnCamera.addEventListener('click', () => fileCamera.click());
 btnGallery.addEventListener('click', () => fileGallery.click());
-fileCamera.addEventListener('change', (e) => handleFile(e.target.files[0]));
 fileGallery.addEventListener('change', (e) => handleFile(e.target.files[0]));
 
 function setButtonsEnabled(enabled) {
-  btnCamera.disabled = !enabled;
   btnGallery.disabled = !enabled;
 }
 
