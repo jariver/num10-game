@@ -15,6 +15,8 @@ function getWorker(onLog) {
       corePath: 'vendor',
       langPath: 'vendor',
       gzip: true,
+      cacheMethod: 'none',
+      workerBlobURL: false,
       logger: onLog || (() => {}),
     }).then(async (worker) => {
       await worker.setParameters({

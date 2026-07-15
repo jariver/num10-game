@@ -1,4 +1,4 @@
-const CACHE_NAME = 'num10-game-v1';
+const CACHE_NAME = 'num10-game-v2';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -38,6 +38,15 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  // Do NOT intercept range/partial requests (used by wasm streaming
+  // compilation and large-file fetches) -- some WebKit versions hang
+  // indefinitely if a Service Worker answers a Range request with a
+  // full 200 response instead of passing it straight to the network.
+  if (event.request.headers.has('range')) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;

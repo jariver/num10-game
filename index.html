@@ -166,7 +166,7 @@ function setButtonsEnabled(enabled) {
 
 async function warmUpOCR() {
   try {
-    await Num10OCR.getWorker();
+    await withTimeout(Num10OCR.getWorker(), 45000, 'OCR引擎初始化');
     offlineBadge.textContent = '离线资源已就绪，可断网使用';
     offlineBadge.className = 'offline-badge ready';
   } catch (err) {
@@ -189,6 +189,18 @@ function handleFile(file) {
   reader.readAsDataURL(file);
 }
 
+async function withTimeout(promise, ms, label) {
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label}超时（超过${Math.round(ms / 1000)}秒未响应，可能是浏览器兼容性问题，建议尝试更换浏览器或重新加载页面）`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function runPipeline(imgEl) {
   resultsEl.innerHTML = '';
   setButtonsEnabled(false);
@@ -203,11 +215,15 @@ async function runPipeline(imgEl) {
     progressFill.style.width = '0%';
     statusEl.innerHTML = '<span class="spinner"></span>正在识别数字 (0%)...';
 
-    const { grid, confidence } = await Num10OCR.ocrGrid(canvas, detection, (done, total) => {
-      const pct = Math.round((done / total) * 100);
-      progressFill.style.width = pct + '%';
-      statusEl.innerHTML = `<span class="spinner"></span>正在识别数字 (${pct}%)...`;
-    });
+    const { grid, confidence } = await withTimeout(
+      Num10OCR.ocrGrid(canvas, detection, (done, total) => {
+        const pct = Math.round((done / total) * 100);
+        progressFill.style.width = pct + '%';
+        statusEl.innerHTML = `<span class="spinner"></span>正在识别数字 (${pct}%)...`;
+      }),
+      60000,
+      '数字识别'
+    );
 
     statusEl.innerHTML = '<span class="spinner"></span>正在求解消除...';
     const { rounds, finalBoard } = Num10Solver.solve(grid);
