@@ -1,4 +1,4 @@
-const CACHE_NAME = 'num10-game-v5';
+const CACHE_NAME = 'num10-game-v6';
 
 // All assets needed for a fully offline run are precached on install,
 // including the OCR engine files (worker script, wasm core, language
@@ -66,7 +66,13 @@ self.addEventListener('fetch', (event) => {
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
       return fetch(event.request).then((response) => {
-        if (response && response.status === 200 && response.type === 'basic') {
+        // Cache successful same-origin ("basic") responses AND readable
+        // cross-origin CORS responses (e.g. the jsDelivr GitHub-mirror
+        // fallback used when GitHub Pages itself is slow/unreliable on
+        // some mobile carrier networks). Opaque no-cors responses are
+        // intentionally excluded since their body can't be verified and
+        // caching them provides little value here.
+        if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
