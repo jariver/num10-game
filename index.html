@@ -120,11 +120,17 @@
 </header>
 
 <div class="container">
-  <div class="card">
+  <div class="card" id="engine-loading-card">
+    <div class="summary"><span id="engine-loading-text">正在下载识别引擎（约9MB，仅首次需要）...</span></div>
+    <div class="progress-bar" id="engine-progress-bar"><div class="progress-bar-fill" id="engine-progress-fill"></div></div>
+    <div class="status" id="engine-loading-hint" style="margin-top:8px;">下载完成后可离线使用，请保持页面打开</div>
+  </div>
+
+  <div class="card" id="upload-card" style="display:none;">
     <div id="upload-zone" class="upload-zone">点击下方按钮拍照或从相册选择游戏截图</div>
     <div class="btn-row">
-      <button class="btn btn-primary" id="btn-camera">拍照</button>
-      <button class="btn btn-secondary" id="btn-gallery">从相册选择</button>
+      <button class="btn btn-primary" id="btn-camera" disabled>拍照</button>
+      <button class="btn btn-secondary" id="btn-gallery" disabled>从相册选择</button>
     </div>
     <input type="file" id="file-camera" accept="image/*" capture="environment">
     <input type="file" id="file-gallery" accept="image/*">
@@ -157,6 +163,11 @@ const resultsEl = document.getElementById('results');
 const progressBar = document.getElementById('progress-bar');
 const progressFill = document.getElementById('progress-fill');
 const offlineBadge = document.getElementById('offline-badge');
+const engineLoadingCard = document.getElementById('engine-loading-card');
+const engineLoadingText = document.getElementById('engine-loading-text');
+const engineProgressFill = document.getElementById('engine-progress-fill');
+const engineLoadingHint = document.getElementById('engine-loading-hint');
+const uploadCard = document.getElementById('upload-card');
 
 btnCamera.addEventListener('click', () => fileCamera.click());
 btnGallery.addEventListener('click', () => fileGallery.click());
@@ -166,6 +177,22 @@ fileGallery.addEventListener('change', (e) => handleFile(e.target.files[0]));
 function setButtonsEnabled(enabled) {
   btnCamera.disabled = !enabled;
   btnGallery.disabled = !enabled;
+}
+
+const STAGE_LABELS = {
+  'loading tesseract core': '下载识别引擎核心',
+  'initializing tesseract': '初始化识别引擎',
+  'loading language traineddata': '下载语言数据',
+  'initializing api': '初始化接口',
+  'recognizing text': '识别文字',
+};
+
+function onEngineProgress(m) {
+  if (!m || typeof m.progress !== 'number') return;
+  const pct = Math.round(m.progress * 100);
+  const label = STAGE_LABELS[m.status] || m.status || '加载中';
+  engineLoadingText.textContent = `正在${label}（${pct}%）...`;
+  engineProgressFill.style.width = pct + '%';
 }
 
 let currentStage = '初始化';
@@ -246,14 +273,28 @@ window.addEventListener('unhandledrejection', (e) => {
 async function warmUpOCR() {
   currentStage = 'OCR引擎初始化';
   try {
-    await withTimeout(Num10OCR.getWorker(), 45000, 'OCR引擎初始化');
+    await withTimeout(Num10OCR.getWorker(onEngineProgress), 90000, 'OCR引擎初始化');
     offlineBadge.textContent = '离线资源已就绪，可断网使用';
     offlineBadge.className = 'offline-badge ready';
+    engineLoadingCard.style.display = 'none';
+    uploadCard.style.display = 'block';
+    setButtonsEnabled(true);
   } catch (err) {
     offlineBadge.textContent = '离线资源加载失败，点击查看详情';
     offlineBadge.className = 'offline-badge loading';
     offlineBadge.style.cursor = 'pointer';
     offlineBadge.onclick = () => showError(err);
+    engineLoadingText.textContent = '识别引擎加载失败';
+    engineLoadingHint.innerHTML = '点击下方按钮重试，或查看 <a href="#" id="engine-error-link">详细原因</a>';
+    const retryEngineBtn = document.createElement('button');
+    retryEngineBtn.className = 'btn btn-primary';
+    retryEngineBtn.textContent = '重新加载';
+    retryEngineBtn.style.marginTop = '10px';
+    retryEngineBtn.style.width = '100%';
+    retryEngineBtn.addEventListener('click', () => location.reload());
+    engineLoadingCard.appendChild(retryEngineBtn);
+    const link = document.getElementById('engine-error-link');
+    if (link) link.addEventListener('click', (e) => { e.preventDefault(); showError(err); });
   }
 }
 warmUpOCR();

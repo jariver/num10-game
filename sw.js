@@ -1,4 +1,17 @@
-const CACHE_NAME = 'num10-game-v3';
+const CACHE_NAME = 'num10-game-v5';
+
+// All assets needed for a fully offline run are precached on install,
+// including the OCR engine files (worker script, wasm core, language
+// data). These are now ~9MB total after removing dead-weight files
+// (standalone .wasm binaries that were never fetched separately -- the
+// wasm binary is embedded as base64 inside the .wasm.js loader) and
+// unused Legacy-engine variants (this app only uses LSTM mode).
+//
+// cache.add() is used individually (not cache.addAll()) so that a
+// single failing asset does not abort the entire install -- addAll()
+// fails atomically on any single 404/network error, which previously
+// caused silent total offline-cache failure whenever this list drifted
+// out of sync with the actual vendor/ directory contents.
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -9,14 +22,8 @@ const CORE_ASSETS = [
   './js/renderer.js',
   './vendor/tesseract.min.js',
   './vendor/worker.min.js',
-  './vendor/tesseract-core.wasm.js',
-  './vendor/tesseract-core.wasm',
-  './vendor/tesseract-core-simd.wasm.js',
-  './vendor/tesseract-core-simd.wasm',
   './vendor/tesseract-core-lstm.wasm.js',
-  './vendor/tesseract-core-lstm.wasm',
   './vendor/tesseract-core-simd-lstm.wasm.js',
-  './vendor/tesseract-core-simd-lstm.wasm',
   './vendor/eng.traineddata.gz',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -24,7 +31,15 @@ const CORE_ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.allSettled(
+        CORE_ASSETS.map((url) =>
+          cache.add(url).catch((err) => {
+            console.warn('[sw] failed to precache', url, err);
+          })
+        )
+      )
+    ).then(() => self.skipWaiting())
   );
 });
 
