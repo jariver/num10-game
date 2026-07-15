@@ -7,9 +7,14 @@
  */
 
 let workerPromise = null;
+let lastLoggerStatus = null;
 
 function getWorker(onLog) {
   if (!workerPromise) {
+    const logger = (m) => {
+      lastLoggerStatus = m;
+      if (onLog) onLog(m);
+    };
     workerPromise = Tesseract.createWorker('eng', 1, {
       workerPath: 'vendor/worker.min.js',
       corePath: 'vendor',
@@ -17,16 +22,26 @@ function getWorker(onLog) {
       gzip: true,
       cacheMethod: 'none',
       workerBlobURL: false,
-      logger: onLog || (() => {}),
+      logger,
+      errorHandler: (err) => {
+        lastLoggerStatus = { status: 'worker-error', message: (err && err.message) || String(err) };
+      },
     }).then(async (worker) => {
       await worker.setParameters({
         tessedit_char_whitelist: '123456789',
         tessedit_pageseg_mode: '10',
       });
       return worker;
+    }).catch((err) => {
+      workerPromise = null;
+      throw err;
     });
   }
   return workerPromise;
+}
+
+function getLastLoggerStatus() {
+  return lastLoggerStatus;
 }
 
 function cellCanvasToBinary(cellCanvas) {
@@ -124,7 +139,17 @@ async function ocrGrid(canvas, detection, onProgress) {
       cellCanvas.height = box.h;
       const cctx = cellCanvas.getContext('2d');
       cctx.drawImage(canvas, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
-      const { digit, confident } = await ocrDigit(cellCanvas);
+      let digit, confident;
+      try {
+        const result = await ocrDigit(cellCanvas);
+        digit = result.digit;
+        confident = result.confident;
+      } catch (err) {
+        const wrapped = new Error(`识别第 ${r + 1} 行第 ${c + 1} 列格子时失败：${err.message || err}`);
+        wrapped.cause = err;
+        wrapped.cell = { row: r, col: c };
+        throw wrapped;
+      }
       grid[r][c] = digit;
       confidence[r][c] = confident;
       done++;
@@ -134,4 +159,4 @@ async function ocrGrid(canvas, detection, onProgress) {
   return { grid, confidence };
 }
 
-window.Num10OCR = { getWorker, ocrDigit, ocrGrid };
+window.Num10OCR = { getWorker, ocrDigit, ocrGrid, getLastLoggerStatus };
