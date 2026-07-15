@@ -1,4 +1,4 @@
-const CACHE_NAME = 'num10-game-v6';
+const CACHE_NAME = 'num10-game-v7';
 
 // All assets needed for a fully offline run are precached on install,
 // including the OCR engine files (worker script, wasm core, language
@@ -19,6 +19,7 @@ const CORE_ASSETS = [
   './js/grid-detect.js',
   './js/ocr.js',
   './js/solver.js',
+  './js/branch-solver.js',
   './js/renderer.js',
   './vendor/tesseract.min.js',
   './vendor/worker.min.js',
