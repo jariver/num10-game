@@ -209,16 +209,40 @@ function cellCanvasToBinary(cellCanvas) {
   return outCanvas;
 }
 
+function parseDigits(text) {
+  return (text || '').trim().replace(/[^1-9]/g, '');
+}
+
 async function ocrDigit(cellCanvas) {
   const worker = await getWorker();
   const processed = cellCanvasToBinary(cellCanvas);
+
+  await worker.setParameters({ tessedit_pageseg_mode: '10' });
   const { data } = await worker.recognize(processed);
-  const text = (data.text || '').trim();
-  const digits = text.replace(/[^1-9]/g, '');
+  const digits = parseDigits(data.text);
   if (digits.length === 1) return { digit: parseInt(digits, 10), confident: true };
-  if (digits.length > 1) return { digit: parseInt(digits[0], 10), confident: false };
+
+  // PSM 10 (single-char mode) failed to yield exactly one digit -- either
+  // it found nothing (common WASM-Tesseract miss on some fonts/glyphs
+  // that the native pytesseract build handles fine on the first try, per
+  // real-image testing against a bad-case screenshot -- e.g. two "7"
+  // cells that PSM10 read as nothing but PSM8 read correctly) or it
+  // echoed extra stray characters. Retry once with PSM 8 (single-word
+  // mode) before giving up, mirroring the Python pipeline's overall
+  // multi-pass robustness even though the exact trigger condition
+  // differs (Python only retries on >1 digits; JS also retries on 0
+  // digits, which empirically fixes real WASM-engine misses).
+  await worker.setParameters({ tessedit_pageseg_mode: '8' });
+  const { data: data2 } = await worker.recognize(processed);
+  const digits2 = parseDigits(data2.text);
+  await worker.setParameters({ tessedit_pageseg_mode: '10' }); // restore default
+
+  if (digits2.length === 1) return { digit: parseInt(digits2, 10), confident: true };
+  if (digits.length > 0) return { digit: parseInt(digits[0], 10), confident: false };
+  if (digits2.length > 0) return { digit: parseInt(digits2[0], 10), confident: false };
   return { digit: 0, confident: false };
 }
+
 
 async function ocrGrid(canvas, detection, onProgress) {
   const { rows, cols, cellBoxes } = detection;
